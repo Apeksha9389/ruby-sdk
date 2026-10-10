@@ -638,9 +638,9 @@ module Conductor
 
         # Create a switch/decision block
         # @param expression [String, OutputRef] The expression to evaluate
-        # @param evaluator_type [String] 'value-param' (default) or 'javascript'
-        # @param inputs [Hash] Input parameters for the SWITCH task, e.g. values a
-        #   javascript expression reads as $.name
+        # @param evaluator_type [String] How the server evaluates the expression:
+        #   'value-param' (default) or 'javascript' (expression is a script)
+        # @param inputs [Hash] Input parameters available to the expression (e.g. as $.name in javascript)
         # @yield Block containing on/otherwise clauses
         # @return [TaskRef] Reference to the SWITCH task
         # @example
@@ -665,7 +665,7 @@ module Conductor
           builder = SwitchBuilder.new(resolve_value(expression), self)
           builder.instance_eval(&block)
 
-          add_switch_task(builder, evaluator_type: evaluator_type, inputs: inputs)
+          add_switch_task(builder, evaluator_type: evaluator_type, inputs: resolve_hash(inputs))
         end
 
         # Create a loop that executes N times
@@ -869,6 +869,8 @@ module Conductor
 
         # Add a SWITCH task
         # @param builder [SwitchBuilder] The switch builder
+        # @param evaluator_type [String] Evaluator for the switch expression
+        # @param inputs [Hash] Resolved input parameters for the SWITCH task
         # @return [TaskRef] Reference to the SWITCH task
         def add_switch_task(builder, evaluator_type: 'value-param', inputs: {})
           ref_name = generate_ref_name('switch')
@@ -877,10 +879,10 @@ module Conductor
             ref_name: ref_name,
             task_name: 'switch',
             task_type: TaskType::SWITCH,
-            input_parameters: resolve_hash(inputs),
+            input_parameters: inputs,
             options: {
-              evaluator_type: evaluator_type,
               expression: builder.expression,
+              evaluator_type: evaluator_type,
               decision_cases: builder.cases,
               default_case: builder.default
             }
