@@ -638,6 +638,9 @@ module Conductor
 
         # Create a switch/decision block
         # @param expression [String, OutputRef] The expression to evaluate
+        # @param evaluator_type [String] 'value-param' (default) or 'javascript'
+        # @param inputs [Hash] Input parameters for the SWITCH task, e.g. values a
+        #   javascript expression reads as $.name
         # @yield Block containing on/otherwise clauses
         # @return [TaskRef] Reference to the SWITCH task
         # @example
@@ -652,11 +655,17 @@ module Conductor
         #       simple :default_flow
         #     end
         #   end
-        def decide(expression, &block)
+        # @example JavaScript evaluator
+        #   decide "$.amount > 100 ? 'high' : 'low'", evaluator_type: 'javascript', amount: order[:amount] do
+        #     on 'high' do
+        #       simple :manual_review
+        #     end
+        #   end
+        def decide(expression, evaluator_type: 'value-param', **inputs, &block)
           builder = SwitchBuilder.new(resolve_value(expression), self)
           builder.instance_eval(&block)
 
-          add_switch_task(builder)
+          add_switch_task(builder, evaluator_type: evaluator_type, inputs: inputs)
         end
 
         # Create a loop that executes N times
@@ -861,15 +870,16 @@ module Conductor
         # Add a SWITCH task
         # @param builder [SwitchBuilder] The switch builder
         # @return [TaskRef] Reference to the SWITCH task
-        def add_switch_task(builder)
+        def add_switch_task(builder, evaluator_type: 'value-param', inputs: {})
           ref_name = generate_ref_name('switch')
 
           task_ref = TaskRef.new(
             ref_name: ref_name,
             task_name: 'switch',
             task_type: TaskType::SWITCH,
-            input_parameters: {},
+            input_parameters: resolve_hash(inputs),
             options: {
+              evaluator_type: evaluator_type,
               expression: builder.expression,
               decision_cases: builder.cases,
               default_case: builder.default
